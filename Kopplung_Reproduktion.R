@@ -1,0 +1,173 @@
+library(deSolve)
+
+################################################################################
+# KOPPLUNG 1: Toggle Switch kontrolliert Repressilator
+repressilator_unter_toggle_switch <- function(time, state, parameters, signal) {
+  ff1 <- signal(time)
+  with(as.list(c(state, parameters)), {
+    # Toggle Switch
+    dX1 <- e/(1 + Y1^n) - d * X1 + ff1
+    dY1 <- e/(1 + X1^n) - d * Y1 + f2
+    
+    # Definition von a1 als Funktion von X
+    a1 <- A * X1 + B
+    
+    # Repressilator
+    dM11 <- s * (-M11 + a1/(1 + P21^m))
+    dM21 <- s * (-M21 + a/(1 + P31^m))
+    dM31 <- s * (-M31 + a/(1 + P11^m))
+    dP11 <- s * (b * M11 - y * P11)
+    dP21 <- s * (b * M21 - y * P21)
+    dP31 <- s * (b * M31 - y * P31)
+    
+    return(list(c(dX1, dY1, dM11, dM21, dM31, dP11, dP21, dP31), f1 = ff1))
+  })
+}
+
+# Wechsel des Zustands von X als Signal 
+signal <- approxfun(x = c(0, 10, 50), 
+                    y = c(0, 1, 1), 
+                    method = "constant", rule = 2)
+
+# Zeitintervall
+kopplungstimes <- seq(0, 50, by = 0.1)
+
+
+# Setze Parameter für Kopplung mit a1
+kopplung1_pars <- c(e = 2, 
+                    n = 4, 
+                    d = 1, 
+                    A = 50, 
+                    B = 0, 
+                    a = 100, 
+                    m = 2, 
+                    b = 5, 
+                    y = 5, 
+                    s = 1, 
+                    f1 = 0, 
+                    f2 = 0)
+
+# Setze den Startzustand
+initial_state_kopplung1 <- c(X1 = 0.1, 
+                             Y1 = 2, 
+                             M11 = 2.5, 
+                             M21 = 10, 
+                             M31 = 0.5, 
+                             P11 = 0.2, 
+                             P21 = 0.45, 
+                             P31 = 0.35)
+
+# Löse DGLS für Kopplung 1
+kopplung1 <- ode(y = initial_state_kopplung1, 
+                 times = kopplungstimes, 
+                 func = repressilator_unter_toggle_switch, 
+                 parms = kopplung1_pars, 
+                 signal = signal)
+
+################################################################################
+# Plots zur Visualisierung von Kopplung 1
+
+matplot(x = kopplung1[, "time"], 
+       y = kopplung1[, c("X1", "Y1")], 
+       type = "l", 
+       lty = 1, 
+       col = c("#009999", "#00FF33", "#FF66CC"),  
+       xlab = "Zeit", ylab = "Konzentration von Gen X und Y", 
+       main = "Kopplung 1")
+legend("topright", 
+       legend = c("X1", "Y1"), 
+       col = c("#009999", "#00FF33", "#FF66CC"), 
+       lty = c(1, 5, 10))
+
+matplot(x = kopplung1[, "time"], 
+        y = kopplung1[, c("M11", "M21", "M31")], 
+        type = "l", 
+        lty = 1, 
+        col = c("#009999", "#00FF33", "#FF66CC"), 
+        xlab = "Zeit", ylab = "mRNA-Konzentration", 
+        main = "Kopplung 1")
+legend("topright", 
+       legend = c("M11", "M21", "M31"), 
+       col = c("#009999", "#00FF33", "#FF66CC"), 
+       lty = c(1, 5, 10))
+
+################################################################################
+# KOPPLUNG 2: Repressilator kontrolliert Toggle Switch
+toggle_switch_unter_repressilator <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    # Repressilator
+    dM11 <- s * (-M11 + a/(1 + P21^m))
+    dM21 <- s * (-M21 + a/(1 + P31^m))
+    dM31 <- s * (-M31 + a/(1 + P10^m))
+    dP10 <- s * (b * M11 - y * P10)
+    dP21 <- s * (b * M21 - y * P21)
+    dP31 <- s * (b * M31 - y * P31)
+    
+    # Definition von a1 als Funktion von X
+    e1 <- A1 * P10 + B1
+    
+    # Toggle Switch
+    dX1 <- e1/(1 + Y1^n) - d * X1 
+    dY1 <- e/(1 + X1^n) - d * Y1
+    
+    return(list(c(dX1, dY1, dM11, dM21, dM31, dP10, dP21, dP31)))
+  })
+}
+
+# Setze Parameter für Kopplung mit e1
+kopplung2_pars <- c(e = 2, 
+                    n = 4, 
+                    d = 1, 
+                    A1 = 0.21, 
+                    B1 = 0, 
+                    a = 300, 
+                    m = 2, 
+                    b = 5, 
+                    y = 5, 
+                    s = 1)
+
+# Setze den Startzustand
+initial_state_kopplung2 <- c(X1 = 0.1, 
+                             Y1 = 2, 
+                             M11 = 0.5, 
+                             M21 = 20.5, 
+                             M31 = 20.5, 
+                             P10 = 40, 
+                             P21 = 90, 
+                             P31 = 70)
+
+# Löse DGLS für Kopplung 2
+kopplung2 <- ode(y = initial_state_kopplung2, 
+                 times = seq(0, 50, by = 0.1), 
+                 func = toggle_switch_unter_repressilator, 
+                 parms = kopplung2_pars)
+
+################################################################################
+# Plots zur Visualisierung von Kopplung 2
+
+matplot(x = kopplung2[, "time"], 
+        y = kopplung2[, c("M11", "M21", "M31")], 
+        type = "l", 
+        lty = 1, 
+        col = c("#009999", "#00FF33", "#FF66CC"), 
+        xlab = "Zeit", 
+        ylab = "mRNA-Konzentration", 
+        main = "Kopplung 2")
+legend("topright", 
+       legend = c("M11", "M21", "M31"), 
+       col = c("#009999", "#00FF33", "#FF66CC"), 
+       lty = c(1, 5, 10))
+
+matplot(x = kopplung2[, "time"], 
+        y = kopplung2[, c("X1", "Y1")], 
+        type = "l", 
+        lty = 1, 
+        col = c("#009999", "#00FF33", "#FF66CC"), 
+        xlab = "Zeit", 
+        ylab = "Konzentration von Gen X und Y", 
+        main = "Kopplung 2")
+legend("topright", 
+       legend = c("X1", "Y1"), 
+       col = c("#009999", "#00FF33", "#FF66CC"), 
+       lty = c(1, 5, 10))
